@@ -45,6 +45,7 @@ def get_coverage_holes(operator: Optional[str] = None, db: Session = Depends(get
 def get_heatmap(
     network_type:  Optional[str] = None,
     operator_name: Optional[str] = None,
+    limit:         int           = 20000,
     db: Session = Depends(get_db)
 ):
     """All geo-referenced measurements for heatmap rendering."""
@@ -58,6 +59,7 @@ def get_heatmap(
         if operator_name:
             filters.append("operator_name = :operator_name")
             params["operator_name"] = operator_name
+        params["limit"] = min(limit, 50000)
 
         where = " AND ".join(filters)
         sql   = text(f"""
@@ -66,7 +68,7 @@ def get_heatmap(
             FROM network_measurements
             WHERE {where}
             ORDER BY id DESC
-            LIMIT 5000
+            LIMIT :limit
         """)
         rows = db.execute(sql, params).fetchall()
         return [

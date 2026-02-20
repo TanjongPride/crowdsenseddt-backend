@@ -26,7 +26,6 @@ def upload_measurements(
     user_id    = measurements[0].user_id
     device_id  = measurements[0].device_id
 
-    # If session doesn't exist (e.g. local UUID fallback), create it automatically
     session = db.query(MeasurementSession).filter(
         MeasurementSession.id == session_id
     ).first()
@@ -103,22 +102,39 @@ def upload_measurements(
 
 
 class MeasurementResponse(BaseModel):
-    id:           int
-    session_id:   UUID
-    timestamp:    datetime
-    network_type: Optional[str]
-    rsrp:         Optional[float]
-    rsrq:         Optional[float]
-    sinr:         Optional[float]
-    latitude:     Optional[float]
-    longitude:    Optional[float]
+    id:            int
+    session_id:    UUID
+    timestamp:     datetime
+    network_type:  Optional[str]
+    operator_name: Optional[str]
+    rsrp:          Optional[float]
+    rsrq:          Optional[float]
+    sinr:          Optional[float]
+    rssi:          Optional[float]
+    latitude:      Optional[float]
+    longitude:     Optional[float]
 
     class Config:
         from_attributes = True
 
 
 @router.get("/measurements", response_model=List[MeasurementResponse])
-def get_measurements(limit: int = 100, db: Session = Depends(get_db)):
-    return db.query(NetworkMeasurement).order_by(
-        NetworkMeasurement.timestamp.desc()
-    ).limit(limit).all()
+def get_measurements(
+    limit:        int           = 100,
+    network_type: Optional[str] = None,
+    min_rsrp:     Optional[float] = None,
+    db:           Session       = Depends(get_db)
+):
+    query = db.query(NetworkMeasurement)
+
+    if network_type:
+        query = query.filter(NetworkMeasurement.network_type == network_type)
+    if min_rsrp is not None:
+        query = query.filter(NetworkMeasurement.rsrp >= min_rsrp)
+
+    return (
+        query
+        .order_by(NetworkMeasurement.id.desc())
+        .limit(min(limit, 500))  # max 500 per page
+        .all()
+    )
